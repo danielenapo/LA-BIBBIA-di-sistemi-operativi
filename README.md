@@ -22,5 +22,11 @@ all: $(BIN)
   * per l'inizio del figlio (quando c'è if(pid==0))
   * commento che dice che i figli tornano -1 in caso di errore (appena inizia il figlio)
   * spiega lo schema di comunicazione (prima di chiudere le pipe inutilizzate)
+
+## CONTROLLI OBBLIGATORI
+
+  * **malloc**: controllo sul puntatore del nuovo vettore (non deve essere NULL)
+  * **read o write**: controllo sul valore di ritorno (deve essere uguale alla dimensione di lettura/scrittur)
+  * **open**: controllo sul valore di ritorno (non deve essere <0)
   
   
