@@ -1,4 +1,4 @@
-# LA-BIBBIA-di-sistemi-operativi
+# LA BIBBIA di sistemi operativi
 le sacre scritture della parte in C dell'esame di Sistemi Operativi.
 
 ## makefile
