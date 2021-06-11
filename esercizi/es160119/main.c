@@ -90,6 +90,8 @@ int main(int argc, char **argv){
       linea[j]=inpbuf;
 			//se arrivo alla fine della linea scrivo al padre il primo carattere, leggo il token e in base al suo valore scrivo in output o meno
 			if(inpbuf=='\n'){
+        linea[j]=0;//la rendo una stringa
+        j++;//incremento j
         ret=write(piped[c][1],&j, sizeof(int)); //mando al padre la lunghezza della LINEA
         if(ret!=sizeof(int)){
           perror("Errore scritturalunghezza linea al padre\n");
