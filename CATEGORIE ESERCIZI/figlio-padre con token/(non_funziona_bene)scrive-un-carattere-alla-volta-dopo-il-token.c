@@ -65,7 +65,7 @@ int main(int argc, char **argv){
 							exit(-1);
 		}
 		//CODICE
-		while(read(pipex[c][0],&x,1)){
+		while(read(pipex[c][0],&x,1)){ //il testo chiedeva esplicitamente di leggere solo dopo aver rivecuto un token
 			//se il token x vale 't' (terminato), esce dal ciclo e fa exit(0)
 			if(x=='t')
 				break;
