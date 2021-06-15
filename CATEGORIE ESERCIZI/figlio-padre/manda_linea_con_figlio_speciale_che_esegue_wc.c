@@ -9,8 +9,6 @@
 #include <stdbool.h>
 #define PERM 0644
 
-
-
 int main(int argc, char **argv){
 	int  pid, pidFiglio, status,ret,fd;
   int l, nLinee, returnL; //contatore lunghezza linee e numero delle linee
@@ -19,7 +17,6 @@ int main(int argc, char **argv){
 	char ch; //variabile per leggere i singoli caratteri dei file associati ai figli
 	char line[210], nLineeString[5]; //variabile su cui si salva la linea (si suppone avere max 210 caratteri), e variabile su cui si salva il risultato della wc
 	typedef int pipe_t[2];
-
 
 	//CONTROLLO PARAMETRI
 	if(argc < 3){
