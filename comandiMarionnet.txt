@@ -1,0 +1,228 @@
+HOST:
+
+#configura interfaccia di rete
+/etc/network/interfaces ->
+auto eth0 
+iface eth0 inet static 
+address 192.168.1.1
+	netmask 255.255.255.0
+	gateway 192.168.1.254
+post-up <comando> && <comando2>
+[oppure iface eth0 inet dhcp]
+
+ifup eth0
+
+#Per debugging robe
+ifconfig [eth0 | eth0 up]
+arping <addr> | arping -0Bi eth0
+ping <addr> 
+tcpdump [-ni eth0] 
+route -n
+__________________________________________________________________________________________________
+
+
+
+TRAFFIC SHAPING:
+
+#visualizza regole
+tc -s qdisc show dev eth0
+
+#classless
+tc qdisc add dev eth0 root tbf rate 1Mbit latency 50ms burst 1539
+#elimino regola sulla root
+tc qdisc del root dev eth0 
+#inserisco la qdisc htb nella root
+tc qdisc add dev eth0 root handle 1: htb default 20
+#Colleghiamo alla qdisc root appena creata la classe htb: 
+tc class add dev eth0 parent 1: classid 1:1 htb rate 100Mbit burst 15k
+#Aggiungiamo alla classe 1:1 le due classi figlie 
+tc class add dev eth0 parent 1:1 classid 1:10 htb rate 1Mbit burst 15k 
+tc class add dev eth0 parent 1:1 classid 1:20 htb rate 20Mbit ceil 50Mbit burst 15k
+#Aggiungiamo alla classe 1:10 la qdisc 10: 
+tc qdisc add dev eth0 parent 1:10 handle 10: pfifo limit 50 
+#Aggiungiamo alla classe 1:20 la qdisc 20: 
+tc qdisc add dev eth0 parent 1:20 handle 20: pfifo limit 50 
+#Aggiungiamo il filtro per redirigere I pacchetti con ip destinazione 192.168.0.2 alla classe 1:10 (quella più lenta): 
+tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dst 192.168.1.2 flowid 1:10
+
+__________________________________________________________________________________________________
+
+
+
+VLAN - host trunk:
+
+#configura interfaccia di rete virtuale trunk
+/etc/network/interfaces ->
+	auto eth0.<N>
+iface eth0.<N> inet static 
+address 192.168.1.1
+	netmask 255.255.255.0
+	gateway 192.168.1.254
+post-up <comando>
+[oppure iface eth0 inet dhcp]
+
+ifup eth0.<N>
+	
+#configura interfaccia di rete temporanea
+ip link add link <physif> <virtif> type vlan id <N>
+#oppure
+vconfig add <physif> <N>
+
+#rimozione
+ip link del <virtif>
+#oppure
+vconfig rem <physif>.<N>
+
+
+VLAN - vde_switch:
+
+#Per debugging robe
+help
+vlan/print  ( #se tagged=1 link trunk, tagged=0 access link )
+
+#per config le vlan
+file configurazione ->
+	#crea
+	vlan/create <vlan_num>
+	#access link -> aggiungi host ad una vlan
+	port/setvlan <port_num> <vlan_num>
+	#trunk -> passa la vlan all’host trunk o all’altro switch
+	vlan/addport <vlan_num> <port_num>
+__________________________________________________________________________________________________
+
+
+
+DHCP SERVER:
+
+/etc/network/interfaces ->
+	auto eth0
+	iface eth0 inet static
+		address 192.168.1.254
+
+/etc/dhcp/dhcpd.conf ->
+	option domain-name "retilab.org"; 
+option domain-name-servers 192.168.1.254; 
+authoritative; 
+default-lease-time 600; 
+max-lease-time 7200; 
+log-facility local7;
+# configurazione di una sottorete 
+shared-network 192-168-1 {
+subnet 192.168.1.0 
+netmask 255.255.255.0 
+{ 
+# parametri per la sottorete andrebbero qui 
+option routers 192.168.1.254; 
+} 
+# range di indirizzi disponibili 
+pool { 
+range 192.168.1.10 192.168.1.19; 
+} 
+}
+# client3 si identifica da mac address e IP fisso 
+host client3 {
+# indirizzo mac preso da marionnet 
+hardware ethernet 02:04:06:11:22:33; 
+fixed-address 192.168.1.3; 
+}
+/etc/default/isc-dhcp-server ->
+INTERFACES=”eth0”
+
+ifup eth0
+
+service isc-dhcp-server start
+systemctl enable isc-dhcp-server
+
+
+dhcp client:
+/etc/network/interfaces ->
+	auto eth0
+	iface eth0 inet dhcp
+ifup eth0
+router:
+
+/etc/sysctl.conf ->
+	net.ipv4.ip_forward=1
+
+#riavvia
+sysctl -p /etc/sysctl.conf
+
+
+#debug
+route -n
+
+
+#Routing verso un host:
+route add -host <target> gw <gwaddr>
+#Routing verso una subnet: 
+route add -net <netaddr> netmask <mask> gw <gwaddr>
+#Impostazione del default gateway: 
+route add default gw <gwaddr>
+__________________________________________________________________________________________________
+
+
+
+FIREWALL:
+
+iptables -t <tabella> [-P (policy) | -A (add) | -D (del) ] <catena>
+tabelle: filter, nat
+catene: INPUT, FORWARD
+
+#visualizza regole
+iptables -t filter -L -v -n
+
+#imposta negazione implicita pacchetti in transito
+iptables -t filter -P FORWARD DROP
+
+#blocca tutti i pacchetti verso il firewall, tranne connessione ssh da 192.168.1.2
+iptables -t filter -P INPUT DROP
+iptables -t filter -A INPUT -p tcp --dport ssh -i eth1 -s 192.168.1.2 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -t filter -A OUTPUT -p tcp --sport ssh -d 192.168.1.2 -m state --state ESTABLISHED -j ACCEPT
+
+#es add regola: blocca (drop) tutti i pacchetti tcp in ingresso in eth0 con porta di destinazione 22
+iptables -t filter -A FORWARD -p tcp --dport 22 -i eth0 -j DROP
+
+#es add regola: consenti connessioni tcp sulla porta 80 da Internet verso 155.185.1.1
+iptables -A FORWARD -p tcp --dport www -i eth2 -o eth0 -d 155.185.1.1 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -p tcp --sport www -i eth0 -o eth2 -s 155.185.1.1 -m state --state ESTABLISHED -j ACCEPT
+
+#es add regola: consenti connessione e scambio FTP
+iptables -A FORWARD -p tcp --dport ftp -i eth2 -o eth0 -d 155.185.1.2 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -p tcp --sport ftp -i eth0 -o eth2 -s 155.185.1.2 -m state --state ESTABLISHED -j ACCEPT
+iptables -A FORWARD -p tcp --sport ftp-data -o eth2 -i eth0 -s 155.185.1.2 -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -p tcp --dport ftp-data -o eth0 -i eth2 -d 155.185.1.2 -m state --state ESTABLISHED -j ACCEPT
+
+#es add regola: consenti alle macchine della LAN di inviare pacchetti in internet e di ricevere  pacchetti di risposta e correlati
+iptables -A FORWARD -i eth1 -o eth2 -j ACCEPT
+iptables -A FORWARD -o eth1 -i eth2 -m state --state ESTABLISHED,RELATED -j ACCEPT
+ 
+#es add regola snat (dinamico): consenti alle macchine in 192.168.1.0/24 di accedere a internet condividendo l’ip pubblico associato all’interfaccia eth2 di firewall
+iptables -t nat -A POSTROUTING -o eth2 -s 192.168.1.1/24 -j MASQUERADE
+
+
+
+#es add regola dnat(statico): consenti a 11.22.33.211 di aprire connessioni tcp sulla porta 22 di 192.168.1.1 utilizzando come destinazione l’ip pubblico 155.185.1.9 associato a eth2 di 
+firewall
+iptables -t filter -A FORWARD -i eth2 -o eth1 -s 11.22.33.211 -p tcp --dport ssh -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -t filter -A FORWARD -o eth2 -i eth1 -d 11.22.33.211 -p tcp --sport ssh -m state --state ESTABLISHED -j ACCEPT
+iptables -t nat -A PREROUTING -p tcp --dport ssh -i eth2 -s 11.22.33.211 -d 155.185.1.9 -j DNAT --to-destination 192.168.1.1 
+
+#es: consenti agli host di internet di accedere al sito web di 192.168.1.1 utilizzando l’indirizzo pubblico
+iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination 192.168.1.1
+
+#es del regola: togli la seconda regola di FORWARD di filter
+iptables -t filter -D FORWARD 2
+
+
+
+
+
+
+
+PORTE:
+80 www
+21 ftp
+20 ftp-data
+22 ssh
+
+
