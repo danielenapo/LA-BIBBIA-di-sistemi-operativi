@@ -1,5 +1,5 @@
-# LA BIBBIA di sistemi operativi
-le sacre scritture della parte in C dell'esame di Sistemi Operativi.
+# LA BIBBIA di sistemi operativi (e reti)
+le sacre scritture della parte in C dell'esame di Sistemi Operativi, e qualcosina su socket programming in C e Python.
 
 ## makefile
 ```makefile
