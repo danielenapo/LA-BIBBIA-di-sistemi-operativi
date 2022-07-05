@@ -18,6 +18,9 @@ arping <addr> | arping -0Bi eth0
 ping <addr> 
 tcpdump [-ni eth0] 
 route -n
+
+#per aggiungere associazioni nome-ip statiche
+/etc/hosts
 __________________________________________________________________________________________________
 
 
@@ -47,7 +50,7 @@ tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dst 192.168.1.
 
 __________________________________________________________________________________________________
 
-
+***VLAN***
 
 VLAN - host trunk:
 
@@ -88,17 +91,21 @@ file configurazione ->
 	port/setvlan <port_num> <vlan_num>
 	#trunk -> passa la vlan all’host trunk o all’altro switch
 	vlan/addport <vlan_num> <port_num>
+
+NOTA: port-based in locale, tag-based tra due switch!
 __________________________________________________________________________________________________
 
 
 
-DHCP SERVER:
+***DHCP SERVER***
 
+#configurazione interfaccia del server (statico)
 /etc/network/interfaces ->
 	auto eth0
 	iface eth0 inet static
 		address 192.168.1.254
 
+#configurazione server DHCP
 /etc/dhcp/dhcpd.conf ->
 	option domain-name "retilab.org"; 
 option domain-name-servers 192.168.1.254; 
@@ -108,18 +115,17 @@ max-lease-time 7200;
 log-facility local7;
 # configurazione di una sottorete 
 shared-network 192-168-1 {
-subnet 192.168.1.0 
-netmask 255.255.255.0 
-{ 
-# parametri per la sottorete andrebbero qui 
-option routers 192.168.1.254; 
-} 
-# range di indirizzi disponibili 
-pool { 
-range 192.168.1.10 192.168.1.19; 
-} 
+subnet 192.168.1.0 netmask 255.255.255.0 { 
+	# parametri per la sottorete andrebbero qui 
+	option routers 192.168.1.254; 
+	} 
+	# range di indirizzi disponibili 
+	pool { 
+		range 192.168.1.10 192.168.1.19; 
+	} 
 }
-# client3 si identifica da mac address e IP fisso 
+
+# client3 si identifica da mac address e IP FISSO 
 host client3 {
 # indirizzo mac preso da marionnet 
 hardware ethernet 02:04:06:11:22:33; 
@@ -134,13 +140,19 @@ service isc-dhcp-server start
 systemctl enable isc-dhcp-server
 
 
-dhcp client:
+***CONFIGURAZIONE CLIENT DINAMICA***
 /etc/network/interfaces ->
 	auto eth0
 	iface eth0 inet dhcp
 ifup eth0
-router:
 
+
+
+__________________________________________________________________________________________________
+
+***ROUTING (GATEWAY)***
+
+#configurazione gateway
 /etc/sysctl.conf ->
 	net.ipv4.ip_forward=1
 
@@ -150,19 +162,18 @@ sysctl -p /etc/sysctl.conf
 
 #debug
 route -n
-
-
-#Routing verso un host:
+#Routing verso un altro host
 route add -host <target> gw <gwaddr>
 #Routing verso una subnet: 
 route add -net <netaddr> netmask <mask> gw <gwaddr>
-#Impostazione del default gateway: 
+
+#Impostazione del DEFAULT GATEWAY: 
 route add default gw <gwaddr>
 __________________________________________________________________________________________________
 
 
 
-FIREWALL:
+***FIREWALL***
 
 iptables -t <tabella> [-P (policy) | -A (add) | -D (del) ] <catena>
 tabelle: filter, nat
@@ -224,5 +235,6 @@ PORTE:
 21 ftp
 20 ftp-data
 22 ssh
+
 
 

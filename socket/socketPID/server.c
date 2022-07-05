@@ -36,8 +36,8 @@ int main(int argc, char *argv[])
 			  sizeof(serv_addr)) < 0) 
 			  error("ERROR on binding");
 	 listen(sockfd,5);
-	 while(1){
-		 
+	 
+	 while(1){	 
 		 //CREAZIONE FIGLIO
 		 int pid;
 		 if ((pid = fork()) < 0){
