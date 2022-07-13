@@ -18,11 +18,11 @@ arping <addr> | arping -0Bi eth0
 ping <addr> 
 tcpdump [-ni eth0] 
 route -n
+service networking restart
 
 #per aggiungere associazioni nome-ip statiche
 /etc/hosts
 __________________________________________________________________________________________________
-
 
 
 TRAFFIC SHAPING:
@@ -131,6 +131,7 @@ host client3 {
 hardware ethernet 02:04:06:11:22:33; 
 fixed-address 192.168.1.3; 
 }
+
 /etc/default/isc-dhcp-server ->
 INTERFACES=”eth0”
 
@@ -153,7 +154,7 @@ ________________________________________________________________________________
 ***ROUTING (GATEWAY)***
 
 #configurazione gateway
-/etc/sysctl.conf ->
+/etc/sysctl.conf
 	net.ipv4.ip_forward=1
 
 #riavvia
@@ -162,6 +163,8 @@ sysctl -p /etc/sysctl.conf
 
 #debug
 route -n
+
+**COMANDI PER POSTUP IN /etc/network/interfaces**
 #Routing verso un altro host
 route add -host <target> gw <gwaddr>
 #Routing verso una subnet: 
@@ -193,7 +196,7 @@ iptables -t filter -A OUTPUT -p tcp --sport ssh -d 192.168.1.2 -m state --state 
 #es add regola: blocca (drop) tutti i pacchetti tcp in ingresso in eth0 con porta di destinazione 22
 iptables -t filter -A FORWARD -p tcp --dport 22 -i eth0 -j DROP
 
-#es add regola: consenti connessioni tcp sulla porta 80 da Internet verso 155.185.1.1
+#es add regola: consenti connessioni tcp sulla porta 80 da Internet verso 155.185.1.1 (andata e ritorno)
 iptables -A FORWARD -p tcp --dport www -i eth2 -o eth0 -d 155.185.1.1 -m state --state NEW,ESTABLISHED -j ACCEPT
 iptables -A FORWARD -p tcp --sport www -i eth0 -o eth2 -s 155.185.1.1 -m state --state ESTABLISHED -j ACCEPT
 
@@ -207,8 +210,6 @@ iptables -A FORWARD -p tcp --dport ftp-data -o eth0 -i eth2 -d 155.185.1.2 -m st
 iptables -A FORWARD -i eth1 -o eth2 -j ACCEPT
 iptables -A FORWARD -o eth1 -i eth2 -m state --state ESTABLISHED,RELATED -j ACCEPT
  
-#es add regola snat (dinamico): consenti alle macchine in 192.168.1.0/24 di accedere a internet condividendo l’ip pubblico associato all’interfaccia eth2 di firewall
-iptables -t nat -A POSTROUTING -o eth2 -s 192.168.1.1/24 -j MASQUERADE
 
 
 
@@ -218,15 +219,24 @@ iptables -t filter -A FORWARD -i eth2 -o eth1 -s 11.22.33.211 -p tcp --dport ssh
 iptables -t filter -A FORWARD -o eth2 -i eth1 -d 11.22.33.211 -p tcp --sport ssh -m state --state ESTABLISHED -j ACCEPT
 iptables -t nat -A PREROUTING -p tcp --dport ssh -i eth2 -s 11.22.33.211 -d 155.185.1.9 -j DNAT --to-destination 192.168.1.1 
 
+***NAT***
+
+#es add regola snat (dinamico): consenti alle macchine in 192.168.1.0/24 di accedere a internet condividendo l’ip pubblico associato all’interfaccia eth2 di firewall
+iptables -t nat -A POSTROUTING -o eth2 -s 192.168.1.1/24 -j MASQUERADE
+
 #es: consenti agli host di internet di accedere al sito web di 192.168.1.1 utilizzando l’indirizzo pubblico
 iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination 192.168.1.1
 
-#es del regola: togli la seconda regola di FORWARD di filter
+#ELIMINARE REGOLE (es): togli la seconda regola di FORWARD di filter
 iptables -t filter -D FORWARD 2
 
 
 
-
+***TEST PORTE CON NC***
+#server 
+nc -lvp <porta>
+#client
+nc -nv <ip> <porta>
 
 
 
